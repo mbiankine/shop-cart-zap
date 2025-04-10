@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SettingsRow } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,9 +29,9 @@ const AdminSettings = () => {
     const fetchWhatsAppNumber = async () => {
       try {
         setIsLoading(true);
-        const { data: settings, error } = await supabase
+        const { data, error } = await supabase
           .from('settings')
-          .select('value')
+          .select('*')
           .eq('key', 'whatsapp_number')
           .single();
 
@@ -39,8 +39,8 @@ const AdminSettings = () => {
           throw error;
         }
         
-        if (settings?.value) {
-          setWhatsappNumber(settings.value);
+        if (data?.value) {
+          setWhatsappNumber(data.value);
         }
       } catch (error: any) {
         toast({
@@ -99,7 +99,7 @@ const AdminSettings = () => {
   const handleChangeWhatsApp = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validação simples do número
+    // Simple validation of the number
     const cleanNumber = whatsappNumber.replace(/\D/g, '');
     if (cleanNumber.length < 10) {
       toast({
@@ -112,7 +112,7 @@ const AdminSettings = () => {
     
     setIsSaving(true);
     try {
-      // Verificar se o registro já existe
+      // Check if the record already exists
       const { data: existingSettings } = await supabase
         .from('settings')
         .select('*')
@@ -122,13 +122,13 @@ const AdminSettings = () => {
       let result;
       
       if (existingSettings) {
-        // Atualizar configuração existente
+        // Update existing configuration
         result = await supabase
           .from('settings')
           .update({ value: whatsappNumber })
           .eq('key', 'whatsapp_number');
       } else {
-        // Criar nova configuração
+        // Create new configuration
         result = await supabase
           .from('settings')
           .insert({ key: 'whatsapp_number', value: whatsappNumber });

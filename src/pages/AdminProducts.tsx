@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { PlusCircle, Pencil, Trash2, Image, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Product {
   id: string;
@@ -95,7 +95,7 @@ const AdminProducts = () => {
     if (file) {
       setImageFile(file);
       
-      // Criar preview da imagem
+      // Create image preview
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
@@ -112,32 +112,30 @@ const AdminProducts = () => {
     setImagePreview(null);
   };
   
-  // Função para fazer upload da imagem
+  // Function to upload image to Supabase Storage
   const uploadImage = async (file: File): Promise<string> => {
     setIsUploading(true);
     try {
-      // Criar nome de arquivo único usando timestamp e nome original
-      const timestamp = new Date().getTime();
+      // Create unique file name
       const fileExtension = file.name.split('.').pop();
-      const fileName = `${timestamp}-${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+      const fileName = `${uuidv4()}.${fileExtension}`;
       
-      // Upload da imagem para URL externa (neste exemplo)
-      // Aqui você pode implementar o upload para qualquer serviço de sua preferência
-      // Como esta é uma demonstração, vou simular o upload retornando o preview como URL
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('product-images')
+        .upload(`products/${fileName}`, file);
       
-      // Simular um delay de upload
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (error) throw error;
       
-      // Em um caso real, você faria o upload para um serviço como:
-      // const { data, error } = await supabase.storage
-      //  .from('product-images')
-      //  .upload(fileName, file);
-      
-      // Para esta demonstração, retornamos a URL do preview ou uma URL fixa
-      return imagePreview || 'https://via.placeholder.com/300x300?text=Produto';
+      // Get public URL for the uploaded file
+      const { data: publicURL } = supabase.storage
+        .from('product-images')
+        .getPublicUrl(`products/${fileName}`);
+        
+      return publicURL.publicUrl;
     } catch (error) {
-      console.error('Erro no upload da imagem:', error);
-      throw new Error('Falha ao fazer upload da imagem');
+      console.error('Error uploading image:', error);
+      throw new Error('Failed to upload image');
     } finally {
       setIsUploading(false);
     }
@@ -148,19 +146,28 @@ const AdminProducts = () => {
       if (!currentProduct.name || !currentProduct.price || !currentProduct.category) {
         toast({
           variant: 'destructive',
-          title: 'Campos obrigatórios',
-          description: 'Preencha todos os campos obrigatórios.',
+          title: 'Required fields',
+          description: 'Please fill in all required fields.',
         });
         return;
       }
 
       let imageUrl = currentProduct.image_url;
       
-      // Se tiver um arquivo de imagem novo, fazer upload
+      // If there's a new image file, upload it
       if (imageFile) {
-        imageUrl = await uploadImage(imageFile);
+        try {
+          imageUrl = await uploadImage(imageFile);
+        } catch (error) {
+          toast({
+            variant: 'destructive',
+            title: 'Error uploading image',
+            description: 'Failed to upload product image. Please try again.',
+          });
+          return;
+        }
       } else if (!imageUrl && !isEditing) {
-        // Se não tem imagem URL e não é edição, usar um placeholder
+        // If no image URL and not editing, use a placeholder
         imageUrl = 'https://via.placeholder.com/300x300?text=Sem+Imagem';
       }
 
@@ -180,8 +187,8 @@ const AdminProducts = () => {
 
         if (error) throw error;
         toast({
-          title: 'Produto atualizado',
-          description: 'O produto foi atualizado com sucesso.'
+          title: 'Product updated',
+          description: 'The product has been updated successfully.'
         });
       } else {
         // Insert new product
@@ -197,8 +204,8 @@ const AdminProducts = () => {
 
         if (error) throw error;
         toast({
-          title: 'Produto adicionado',
-          description: 'O produto foi adicionado com sucesso.'
+          title: 'Product added',
+          description: 'The product has been added successfully.'
         });
       }
 
@@ -207,7 +214,7 @@ const AdminProducts = () => {
     } catch (error: any) {
       toast({
         variant: 'destructive',
-        title: 'Erro ao salvar produto',
+        title: 'Error saving product',
         description: error.message,
       });
     }
@@ -217,14 +224,14 @@ const AdminProducts = () => {
     setCurrentProduct(product);
     setIsEditing(true);
     setIsSheetOpen(true);
-    // Se o produto já tiver imagem, mostrar no preview
+    // If product already has an image, show it in the preview
     if (product.image_url) {
       setImagePreview(product.image_url);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (window.confirm('Tem certeza que deseja excluir este produto?')) {
+    if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         const { error } = await supabase
           .from('products')
@@ -234,15 +241,15 @@ const AdminProducts = () => {
         if (error) throw error;
 
         toast({
-          title: 'Produto excluído',
-          description: 'O produto foi excluído com sucesso.'
+          title: 'Product deleted',
+          description: 'The product has been deleted successfully.'
         });
 
         fetchProducts();
       } catch (error: any) {
         toast({
           variant: 'destructive',
-          title: 'Erro ao excluir produto',
+          title: 'Error deleting product',
           description: error.message,
         });
       }

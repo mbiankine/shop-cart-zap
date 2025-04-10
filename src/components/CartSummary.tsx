@@ -4,7 +4,7 @@ import { useStore } from '@/context/StoreContext';
 import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, SettingsRow } from '@/integrations/supabase/client';
 
 const CartSummary: React.FC = () => {
   const { state, dispatch } = useStore();
@@ -12,36 +12,34 @@ const CartSummary: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    // Carregar o número do WhatsApp das configurações do admin
+    // Load the WhatsApp number from admin settings
     const fetchWhatsAppNumber = async () => {
       try {
         setIsLoading(true);
-        // Buscar o número do whatsapp configurado pelo admin
-        const { data: settings, error } = await supabase
+        // Fetch the WhatsApp number configured by admin
+        const { data, error } = await supabase
           .from('settings')
-          .select('value')
+          .select('*')
           .eq('key', 'whatsapp_number')
           .single();
 
-        if (error) {
-          console.error('Erro ao buscar número de WhatsApp:', error);
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows found"
+          console.error('Error fetching WhatsApp number:', error);
           return;
         }
         
-        if (settings?.value) {
-          setWhatsappNumber(settings.value);
-          // Atualizar o contexto para compatibilidade
-          dispatch({ type: 'SET_WHATSAPP_NUMBER', payload: settings.value });
+        if (data?.value) {
+          setWhatsappNumber(data.value);
         }
       } catch (error) {
-        console.error('Erro ao buscar configurações:', error);
+        console.error('Error fetching settings:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchWhatsAppNumber();
-  }, [dispatch]);
+  }, []);
   
   const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -54,10 +52,7 @@ const CartSummary: React.FC = () => {
   };
 
   const sendToWhatsApp = () => {
-    // Usar o número do WhatsApp do estado local ou do contexto como fallback
-    const number = whatsappNumber || state.whatsappNumber;
-    
-    if (!number) {
+    if (!whatsappNumber) {
       toast.error('Número de WhatsApp da loja não configurado. Entre em contato com o administrador.');
       return;
     }
@@ -75,7 +70,7 @@ const CartSummary: React.FC = () => {
         \n*Total do Pedido: ${formatPrice(subtotal)}*`;
 
       // Format WhatsApp number (remove any non-numeric character)
-      const formattedNumber = number.replace(/\D/g, '');
+      const formattedNumber = whatsappNumber.replace(/\D/g, '');
 
       // Create the WhatsApp URL with the message
       const whatsappURL = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;

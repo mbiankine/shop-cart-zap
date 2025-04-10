@@ -7,3 +7,12 @@ const SUPABASE_URL = "https://mwjlshfqddwvtatwhynx.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im13amxzaGZxZGR3dnRhdHdoeW54Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQyNjMwNzMsImV4cCI6MjA1OTgzOTA3M30.FtdfxPawlSpzrx1ig-uaWP16OnKoj-MxaQehRCfdmEE";
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Add types for the 'settings' table since it was just created
+export type SettingsRow = {
+  id: string;
+  key: string;
+  value: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
