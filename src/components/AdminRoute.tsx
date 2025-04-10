@@ -16,6 +16,7 @@ const AdminRoute = () => {
         
         if (!user) {
           setIsAdmin(false);
+          setLoading(false);
           return;
         }
 

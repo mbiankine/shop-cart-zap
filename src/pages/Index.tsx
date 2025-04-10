@@ -45,10 +45,10 @@ const Index = () => {
         const mappedProducts: Product[] = productsData.map(item => ({
           id: parseInt(item.id.substring(0, 8), 16), // Convert UUID to number for compatibility
           name: item.name,
-          price: parseFloat(item.price),
+          price: parseFloat(String(item.price)), // Convert to string first to ensure it works
           image: item.image_url,
           category: item.category,
-          description: item.description
+          description: item.description || ''
         }));
         
         setProducts(mappedProducts);
