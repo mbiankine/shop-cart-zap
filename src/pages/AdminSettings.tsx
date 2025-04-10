@@ -2,22 +2,60 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useStore } from '@/context/StoreContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import WhatsAppInput from '@/components/WhatsAppInput';
 
 const AdminSettings = () => {
   const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [email, setEmail] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [whatsappNumber, setWhatsappNumber] = useState('');
   const { toast } = useToast();
-  const { state } = useStore();
+  
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setEmail(user.email || '');
+      }
+    };
+    getUser();
+    
+    const fetchWhatsAppNumber = async () => {
+      try {
+        setIsLoading(true);
+        const { data: settings, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'whatsapp_number')
+          .single();
 
+        if (error && error.code !== 'PGRST116') { // PGRST116 é "No rows found"
+          throw error;
+        }
+        
+        if (settings?.value) {
+          setWhatsappNumber(settings.value);
+        }
+      } catch (error: any) {
+        toast({
+          variant: 'destructive',
+          title: 'Erro ao carregar configurações',
+          description: error.message,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchWhatsAppNumber();
+  }, [toast]);
+  
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -58,16 +96,61 @@ const AdminSettings = () => {
     }
   };
   
-  // Fetch user email
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setEmail(user.email || '');
+  const handleChangeWhatsApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validação simples do número
+    const cleanNumber = whatsappNumber.replace(/\D/g, '');
+    if (cleanNumber.length < 10) {
+      toast({
+        variant: 'destructive',
+        title: 'Número inválido',
+        description: 'O número de WhatsApp deve ter pelo menos 10 dígitos.',
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      // Verificar se o registro já existe
+      const { data: existingSettings } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('key', 'whatsapp_number')
+        .maybeSingle();
+
+      let result;
+      
+      if (existingSettings) {
+        // Atualizar configuração existente
+        result = await supabase
+          .from('settings')
+          .update({ value: whatsappNumber })
+          .eq('key', 'whatsapp_number');
+      } else {
+        // Criar nova configuração
+        result = await supabase
+          .from('settings')
+          .insert({ key: 'whatsapp_number', value: whatsappNumber });
       }
-    };
-    getUser();
-  }, []);
+      
+      if (result.error) throw result.error;
+      
+      toast({
+        title: 'Configurações salvas',
+        description: 'Número de WhatsApp atualizado com sucesso.',
+      });
+      
+    } catch (error: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar configurações',
+        description: error.message,
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
   
   return (
     <div className="space-y-8">
@@ -80,7 +163,24 @@ const AdminSettings = () => {
             <CardDescription>Configure as informações de contato da loja</CardDescription>
           </CardHeader>
           <CardContent>
-            <WhatsAppInput />
+            <form onSubmit={handleChangeWhatsApp} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">Número de WhatsApp da Loja</Label>
+                <Input
+                  id="whatsapp"
+                  value={whatsappNumber}
+                  onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Ex: 11999999999 (apenas números)"
+                  maxLength={15}
+                />
+                <p className="text-xs text-gray-500">
+                  Digite apenas os números, incluindo o código de área.
+                </p>
+              </div>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving ? 'Salvando...' : 'Salvar Número'}
+              </Button>
+            </form>
           </CardContent>
         </Card>
         

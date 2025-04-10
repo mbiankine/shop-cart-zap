@@ -1,15 +1,48 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '@/context/StoreContext';
 import { Button } from '@/components/ui/button';
 import { Send } from 'lucide-react';
 import { toast } from 'sonner';
-import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 
 const CartSummary: React.FC = () => {
   const { state, dispatch } = useStore();
-  const navigate = useNavigate();
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    // Carregar o número do WhatsApp das configurações do admin
+    const fetchWhatsAppNumber = async () => {
+      try {
+        setIsLoading(true);
+        // Buscar o número do whatsapp configurado pelo admin
+        const { data: settings, error } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'whatsapp_number')
+          .single();
+
+        if (error) {
+          console.error('Erro ao buscar número de WhatsApp:', error);
+          return;
+        }
+        
+        if (settings?.value) {
+          setWhatsappNumber(settings.value);
+          // Atualizar o contexto para compatibilidade
+          dispatch({ type: 'SET_WHATSAPP_NUMBER', payload: settings.value });
+        }
+      } catch (error) {
+        console.error('Erro ao buscar configurações:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchWhatsAppNumber();
+  }, [dispatch]);
+  
   const totalItems = state.cart.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -21,9 +54,11 @@ const CartSummary: React.FC = () => {
   };
 
   const sendToWhatsApp = () => {
-    if (!state.whatsappNumber) {
-      toast.error('Por favor, configure o número de WhatsApp da loja nas configurações.');
-      navigate('/config');
+    // Usar o número do WhatsApp do estado local ou do contexto como fallback
+    const number = whatsappNumber || state.whatsappNumber;
+    
+    if (!number) {
+      toast.error('Número de WhatsApp da loja não configurado. Entre em contato com o administrador.');
       return;
     }
 
@@ -40,10 +75,10 @@ const CartSummary: React.FC = () => {
         \n*Total do Pedido: ${formatPrice(subtotal)}*`;
 
       // Format WhatsApp number (remove any non-numeric character)
-      const whatsappNumber = state.whatsappNumber.replace(/\D/g, '');
+      const formattedNumber = number.replace(/\D/g, '');
 
       // Create the WhatsApp URL with the message
-      const whatsappURL = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(message)}`;
+      const whatsappURL = `https://wa.me/${formattedNumber}?text=${encodeURIComponent(message)}`;
 
       // Open WhatsApp in a new tab
       window.open(whatsappURL, '_blank');
@@ -72,13 +107,14 @@ const CartSummary: React.FC = () => {
       <Button 
         onClick={sendToWhatsApp} 
         className="w-full"
+        disabled={isLoading || !whatsappNumber}
       >
         <Send className="w-4 h-4 mr-2" />
         Finalizar Pedido via WhatsApp
       </Button>
-      {!state.whatsappNumber && (
+      {!whatsappNumber && (
         <p className="text-sm text-red-500">
-          Configure o número de WhatsApp nas configurações.
+          Número de WhatsApp da loja não configurado.
         </p>
       )}
     </div>

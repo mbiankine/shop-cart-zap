@@ -7,7 +7,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { StoreProvider } from "@/context/StoreContext";
 import Index from "./pages/Index";
 import CartPage from "./pages/CartPage";
-import ConfigPage from "./pages/ConfigPage";
 import NotFound from "./pages/NotFound";
 
 // Admin Routes
@@ -32,7 +31,6 @@ const App = () => (
             {/* Public Routes */}
             <Route path="/" element={<Index />} />
             <Route path="/cart" element={<CartPage />} />
-            <Route path="/config" element={<ConfigPage />} />
             
             {/* Admin Routes */}
             <Route path="/admin/login" element={<AdminLogin />} />

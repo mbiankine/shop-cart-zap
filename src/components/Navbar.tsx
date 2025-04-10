@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '@/context/StoreContext';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, Settings, Shield } from 'lucide-react';
+import { ShoppingCart, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -64,9 +64,6 @@ const Navbar = () => {
               Admin
             </Link>
           )}
-          <Link to="/config" className="text-sm font-medium text-gray-600 hover:text-gray-900">
-            <Settings className="w-5 h-5" />
-          </Link>
           <Link to="/cart">
             <Button variant="ghost" className="relative p-2">
               <ShoppingCart className="w-6 h-6" />

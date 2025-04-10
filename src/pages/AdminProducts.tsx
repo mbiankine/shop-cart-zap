@@ -22,7 +22,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PlusCircle, Pencil, Trash2 } from 'lucide-react';
+import { PlusCircle, Pencil, Trash2, Image, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Product {
   id: string;
@@ -45,6 +46,9 @@ const AdminProducts = () => {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentProduct, setCurrentProduct] = useState<Partial<Product>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
 
   // Fetch products and categories
@@ -86,21 +90,78 @@ const AdminProducts = () => {
     setCurrentProduct({ ...currentProduct, [name]: name === 'price' ? parseFloat(value) : value });
   };
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      
+      // Criar preview da imagem
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const resetForm = () => {
     setCurrentProduct({});
     setIsEditing(false);
     setIsSheetOpen(false);
+    setImageFile(null);
+    setImagePreview(null);
+  };
+  
+  // Função para fazer upload da imagem
+  const uploadImage = async (file: File): Promise<string> => {
+    setIsUploading(true);
+    try {
+      // Criar nome de arquivo único usando timestamp e nome original
+      const timestamp = new Date().getTime();
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${timestamp}-${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+      
+      // Upload da imagem para URL externa (neste exemplo)
+      // Aqui você pode implementar o upload para qualquer serviço de sua preferência
+      // Como esta é uma demonstração, vou simular o upload retornando o preview como URL
+      
+      // Simular um delay de upload
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Em um caso real, você faria o upload para um serviço como:
+      // const { data, error } = await supabase.storage
+      //  .from('product-images')
+      //  .upload(fileName, file);
+      
+      // Para esta demonstração, retornamos a URL do preview ou uma URL fixa
+      return imagePreview || 'https://via.placeholder.com/300x300?text=Produto';
+    } catch (error) {
+      console.error('Erro no upload da imagem:', error);
+      throw new Error('Falha ao fazer upload da imagem');
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleAddEdit = async () => {
     try {
-      if (!currentProduct.name || !currentProduct.price || !currentProduct.category || !currentProduct.image_url) {
+      if (!currentProduct.name || !currentProduct.price || !currentProduct.category) {
         toast({
           variant: 'destructive',
           title: 'Campos obrigatórios',
           description: 'Preencha todos os campos obrigatórios.',
         });
         return;
+      }
+
+      let imageUrl = currentProduct.image_url;
+      
+      // Se tiver um arquivo de imagem novo, fazer upload
+      if (imageFile) {
+        imageUrl = await uploadImage(imageFile);
+      } else if (!imageUrl && !isEditing) {
+        // Se não tem imagem URL e não é edição, usar um placeholder
+        imageUrl = 'https://via.placeholder.com/300x300?text=Sem+Imagem';
       }
 
       if (isEditing && currentProduct.id) {
@@ -110,7 +171,7 @@ const AdminProducts = () => {
           .update({
             name: currentProduct.name,
             price: currentProduct.price,
-            image_url: currentProduct.image_url,
+            image_url: imageUrl,
             category: currentProduct.category,
             description: currentProduct.description,
             updated_at: new Date().toISOString(),
@@ -129,7 +190,7 @@ const AdminProducts = () => {
           .insert({
             name: currentProduct.name,
             price: currentProduct.price,
-            image_url: currentProduct.image_url,
+            image_url: imageUrl,
             category: currentProduct.category,
             description: currentProduct.description,
           });
@@ -156,6 +217,10 @@ const AdminProducts = () => {
     setCurrentProduct(product);
     setIsEditing(true);
     setIsSheetOpen(true);
+    // Se o produto já tiver imagem, mostrar no preview
+    if (product.image_url) {
+      setImagePreview(product.image_url);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -220,6 +285,10 @@ const AdminProducts = () => {
                         src={product.image_url} 
                         alt={product.name} 
                         className="h-12 w-12 object-cover rounded"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'https://via.placeholder.com/48?text=Erro';
+                        }}
                       />
                     </TableCell>
                     <TableCell className="font-medium">{product.name}</TableCell>
@@ -318,28 +387,52 @@ const AdminProducts = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="image_url">URL da Imagem *</Label>
-              <Input 
-                id="image_url" 
-                name="image_url"
-                value={currentProduct.image_url || ''} 
-                onChange={handleInputChange} 
-                placeholder="https://exemplo.com/imagem.jpg"
-                required
-              />
-              {currentProduct.image_url && (
-                <div className="mt-2">
-                  <img 
-                    src={currentProduct.image_url} 
-                    alt="Preview" 
-                    className="h-24 object-cover rounded" 
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = 'https://via.placeholder.com/150?text=Erro+na+imagem';
-                    }}
-                  />
+              <Label htmlFor="image">Imagem do Produto</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="border rounded-md p-2 flex items-center justify-center bg-gray-50 h-32 relative">
+                    <input
+                      id="image"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <Image size={24} className="mb-2" />
+                      <span className="text-sm">Clique para selecionar</span>
+                    </div>
+                  </div>
                 </div>
-              )}
+                <div>
+                  {isUploading ? (
+                    <div className="h-32 flex items-center justify-center border rounded-md bg-gray-50">
+                      <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
+                    </div>
+                  ) : (
+                    imagePreview || currentProduct.image_url ? (
+                      <div className="h-32 border rounded-md overflow-hidden bg-gray-50">
+                        <img
+                          src={imagePreview || currentProduct.image_url}
+                          alt="Preview"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.src = 'https://via.placeholder.com/150?text=Erro+na+imagem';
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-32 flex items-center justify-center border rounded-md bg-gray-50">
+                        <span className="text-gray-400 text-sm">Sem imagem</span>
+                      </div>
+                    )
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Selecione uma imagem para o produto. Formatos suportados: JPG, PNG.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -356,7 +449,17 @@ const AdminProducts = () => {
 
           <SheetFooter>
             <Button variant="outline" onClick={resetForm}>Cancelar</Button>
-            <Button onClick={handleAddEdit}>{isEditing ? 'Atualizar' : 'Adicionar'}</Button>
+            <Button 
+              onClick={handleAddEdit}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : isEditing ? 'Atualizar' : 'Adicionar'}
+            </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
